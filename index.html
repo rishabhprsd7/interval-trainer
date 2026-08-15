@@ -1,0 +1,963 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="color-scheme" content="dark light">
+<title>Interval Trainer</title>
+<style>
+  /* ---- dark (default) ---- */
+  :root{
+    --bg:#000; --fg:#fff; --card:#0E0E10; --line:#1B1B1E; --track:#2A2A2E; --dim:#9A9AA0;
+    --warmup:#FF9F0A; --run:#92E82A; --walk:#00D3F2; --cooldown:#BF5AF2;
+    --btn-fg:#000; --ghost-bg:#141416; --ghost-bd:#2A2A2E;
+    --band-bg:#1a1204; --band-bd:#3a2a06;
+    --accent:var(--run);
+  }
+  /* ---- light ---- */
+  html[data-theme="light"]{
+    --bg:#F4F4F6; --fg:#0B0B0C; --card:#FFF; --line:#E3E3E7; --track:#D6D6DC; --dim:#6B6B72;
+    --warmup:#B26A00; --run:#3E8E00; --walk:#00738C; --cooldown:#7A28C4;
+    --btn-fg:#fff; --ghost-bg:#FFF; --ghost-bd:#D6D6DC;
+    --band-bg:#FFF6E5; --band-bd:#E8CE9A;
+  }
+
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;margin:0;padding:0}
+  html{min-height:100%}
+  body{min-height:100dvh;overscroll-behavior:none;background:var(--bg) !important}
+  #backdrop{position:fixed;inset:0;background:var(--bg);z-index:0}
+  body{
+    font-family:-apple-system,"SF Pro Rounded","SF Pro Display",system-ui,"Segoe UI",sans-serif;
+    color:var(--fg);font-variant-numeric:tabular-nums;
+    display:flex;flex-direction:column;align-items:center;
+    padding:max(16px,env(safe-area-inset-top)) 16px max(16px,env(safe-area-inset-bottom));
+    -webkit-user-select:none;user-select:none;
+  }
+  .screen{display:none;flex-direction:column;width:100%;max-width:430px;flex:1;margin:0 auto;
+    position:relative;z-index:1}
+  .screen.on{display:flex}
+  .eyebrow{font-size:10.5px;font-weight:700;letter-spacing:.18em;color:var(--dim);
+    text-transform:uppercase}
+
+  /* theme toggle */
+  .theme{width:34px;height:34px;border-radius:10px;background:var(--card);
+    border:1.5px solid var(--line);color:var(--fg);font-size:15px;line-height:1;
+    display:grid;place-items:center;cursor:pointer;flex:none;padding:0}
+
+  /* ---------- setup ---------- */
+  #setup{gap:16px;padding-bottom:6px}
+  .head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding-top:2px}
+  .head h1{font-size:24px;font-weight:800;letter-spacing:-.03em}
+
+  .presets{display:flex;gap:8px;overflow-x:auto;padding-bottom:2px;scrollbar-width:none}
+  .presets::-webkit-scrollbar{display:none}
+  .chip{flex:none;background:var(--card);border:1.5px solid var(--line);border-radius:12px;
+    padding:9px 14px;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;
+    display:flex;align-items:center;gap:8px;color:var(--fg)}
+  .chip small{color:var(--dim);font-weight:500}
+  .chip .x{color:var(--dim);font-size:16px;line-height:1;padding:0 2px}
+  .chip.add{border-style:dashed;color:var(--dim)}
+
+  .fields{background:var(--card);border-radius:18px;overflow:hidden;
+    border:1.5px solid var(--line)}
+  .f{display:flex;align-items:center;gap:12px;padding:13px 15px;border-bottom:1px solid var(--line)}
+  .f:last-child{border-bottom:none}
+  .f .dot{width:9px;height:9px;border-radius:50%;flex:none}
+  .f .lbl{flex:1;min-width:0}
+  .f .lbl .n{font-size:15.5px;font-weight:600}
+  .f .lbl .u{font-size:11.5px;color:var(--dim);margin-top:2px}
+  .step{display:flex;align-items:center;gap:2px;flex:none}
+  .step button{width:36px;height:36px;border-radius:11px;background:var(--track);color:var(--fg);
+    font-size:20px;font-weight:600;border:none;display:grid;place-items:center;cursor:pointer;
+    line-height:1;padding:0}
+  .step button:active{opacity:.6}
+  .step input{width:60px;background:transparent;border:none;color:var(--fg);font:inherit;
+    font-size:21px;font-weight:700;text-align:center;letter-spacing:-.02em;
+    font-variant-numeric:tabular-nums;padding:4px 0}
+  .step input:focus{outline:none;color:var(--accent)}
+
+  .total{display:flex;background:var(--card);border-radius:18px;overflow:hidden;
+    border:1.5px solid var(--line)}
+  .total>div{flex:1;padding:14px 6px;text-align:center;border-right:1px solid var(--line)}
+  .total>div:last-child{border-right:none}
+  .total .k{font-size:10px;font-weight:700;letter-spacing:.13em;color:var(--dim);
+    text-transform:uppercase}
+  .total .v{font-size:20px;font-weight:800;letter-spacing:-.02em;margin-top:5px}
+
+  .opts{background:var(--card);border-radius:18px;overflow:hidden;border:1.5px solid var(--line)}
+  .opt{display:flex;align-items:center;justify-content:space-between;padding:12px 15px;
+    font-size:15px;border-bottom:1px solid var(--line)}
+  .opt:last-child{border-bottom:none}
+  .sw{width:50px;height:30px;border-radius:15px;background:var(--track);position:relative;
+    cursor:pointer;transition:background .18s;flex:none}
+  .sw::after{content:"";position:absolute;top:2.5px;left:2.5px;width:25px;height:25px;
+    border-radius:50%;background:#fff;transition:transform .18s;
+    box-shadow:0 1px 3px rgba(0,0,0,.3)}
+  .sw[aria-checked="true"]{background:var(--run)}
+  .sw[aria-checked="true"]::after{transform:translateX(20px)}
+
+  /* ---------- workout ---------- */
+  #work{justify-content:space-between;align-items:center;gap:8px;padding-top:4px}
+  .workhead{display:flex;align-items:center;justify-content:space-between;width:100%;gap:10px}
+  .ringwrap{position:relative;width:min(78vw,310px);aspect-ratio:1}
+  svg{width:100%;height:100%;display:block;transform:rotate(-90deg)}
+  .seg{stroke:var(--track);stroke-width:7;stroke-linecap:round;fill:none;transition:stroke .3s}
+  .seg.done{stroke:var(--run)} .seg.now{stroke:var(--fg)}
+  #arcTrack{fill:none;stroke:var(--track);stroke-width:19}
+  #arcFill{fill:none;stroke:var(--accent);stroke-width:19;stroke-linecap:round;transition:stroke .35s}
+  #outerTrack,#outerFill{fill:none;stroke-width:7;stroke-linecap:round}
+  #outerTrack{stroke:var(--track)} #outerFill{stroke:var(--run)}
+  .center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;
+    justify-content:center;gap:4px}
+  .phase{font-size:13.5px;font-weight:800;letter-spacing:.2em;color:var(--accent);
+    text-transform:uppercase;transition:color .35s}
+  .clock{font-size:clamp(54px,17vw,74px);font-weight:800;letter-spacing:-.045em;line-height:.95;
+    color:var(--fg)}
+  .setline{font-size:14.5px;font-weight:600;color:var(--dim)}
+  .setline b{color:var(--fg);font-weight:700}
+
+  .stats{display:flex;width:100%;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+  .stat{flex:1;padding:13px 4px;text-align:center;border-right:1px solid var(--line)}
+  .stat:last-child{border-right:none}
+  .stat .k{font-size:10px;font-weight:700;letter-spacing:.13em;color:var(--dim);text-transform:uppercase}
+  .stat .v{font-size:20px;font-weight:700;letter-spacing:-.02em;margin-top:5px;color:var(--fg)}
+
+  .controls{display:flex;gap:10px;width:100%}
+  button{font-family:inherit;font-size:16px;font-weight:700;border-radius:16px;
+    border:1.5px solid transparent;padding:17px 20px;cursor:pointer;transition:opacity .15s}
+  button:active{opacity:.6}
+  button:focus-visible{outline:2.5px solid var(--walk);outline-offset:3px}
+  .primary{flex:2;background:var(--run);color:var(--btn-fg)}
+  .ghost{flex:1;background:var(--ghost-bg);color:var(--fg);border-color:var(--ghost-bd)}
+  .wide{width:100%}
+  .paused .primary{background:var(--warmup)}
+
+  .banner{width:100%;font-size:12.5px;line-height:1.45;color:var(--warmup);
+    background:var(--band-bg);border:1px solid var(--band-bd);border-radius:12px;
+    padding:10px 13px;display:none;text-align:center}
+  .banner.on{display:block}
+
+  /* ---------- done ---------- */
+  #done{justify-content:center;align-items:center;gap:20px;text-align:center}
+  #done .big{font-size:42px;font-weight:800;letter-spacing:-.03em}
+  .summary{width:100%;background:var(--line);border-radius:16px;overflow:hidden;
+    display:flex;flex-direction:column;gap:1px}
+  .row{display:flex;justify-content:space-between;padding:14px 16px;background:var(--card);font-size:15px}
+  .row span:first-child{color:var(--dim)} .row span:last-child{font-weight:700}
+
+  /* ---------- modal ---------- */
+  #modal,#settings{position:fixed;inset:0;z-index:50;display:none;align-items:center;
+    justify-content:center;padding:24px;background:rgba(0,0,0,.62)}
+  #modal.on,#settings.on{display:flex}
+  .sheet{width:100%;max-width:340px;background:var(--card);border:1.5px solid var(--line);
+    border-radius:20px;padding:20px;display:flex;flex-direction:column;gap:14px}
+  .sheet h2{font-size:18px;font-weight:800;letter-spacing:-.02em;color:var(--fg)}
+  .sheet p{font-size:14px;line-height:1.45;color:var(--dim)}
+  .sheet input{width:100%;background:var(--bg);border:1.5px solid var(--line);border-radius:12px;
+    padding:13px 14px;color:var(--fg);font:inherit;font-size:16px;font-weight:600}
+  .sheet input:focus{outline:none;border-color:var(--run)}
+  .sheet .btns{display:flex;gap:9px}
+  .sheet button{flex:1;padding:14px 12px;font-size:15px}
+
+  .startbar{position:sticky;bottom:0;margin-top:auto;padding:10px 0 2px;
+    background:linear-gradient(to top, var(--bg) 68%, transparent)}
+
+  /* ---------- heart rate ---------- */
+  .hr{display:none;align-items:center;gap:10px;width:100%;justify-content:center;
+    padding:8px 0 2px}
+  .hr.on{display:flex}
+  .hr .beat{font-size:17px;line-height:1}
+  .hr .bpm{font-size:26px;font-weight:800;letter-spacing:-.02em}
+  .hr .zone{font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;
+    padding:4px 9px;border-radius:8px;background:var(--card);border:1.5px solid var(--line)}
+  .hr.stale{opacity:.4}
+  .hrbtn{display:flex;align-items:center;justify-content:space-between;padding:12px 15px;
+    font-size:15px;cursor:pointer}
+  .hrbtn .st{font-size:12.5px;color:var(--dim)}
+
+  @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div id="backdrop"></div>
+
+<!-- ================= SETUP ================= -->
+<section id="setup" class="screen on">
+  <div class="head">
+    <h1>Interval Trainer</h1>
+    <button class="theme" id="themeA" aria-label="Switch theme">☾</button>
+  </div>
+
+  <div class="presets" id="presets"></div>
+
+  <div class="fields">
+    <div class="f">
+      <span class="dot" style="background:var(--warmup)"></span>
+      <div class="lbl"><div class="n">Warm-up</div><div class="u" id="uWarm">minutes</div></div>
+      <div class="step" data-key="warm" data-step="1" data-min="0" data-max="60">
+        <button data-d="-1" aria-label="Less warm-up">−</button>
+        <input inputmode="numeric" id="iWarm" aria-label="Warm-up minutes">
+        <button data-d="1" aria-label="More warm-up">+</button>
+      </div>
+    </div>
+    <div class="f">
+      <span class="dot" style="background:var(--run)"></span>
+      <div class="lbl"><div class="n">Run</div><div class="u" id="uRun">seconds</div></div>
+      <div class="step" data-key="run" data-step="5" data-min="5" data-max="900">
+        <button data-d="-1" aria-label="Shorter run">−</button>
+        <input inputmode="numeric" id="iRun" aria-label="Run seconds">
+        <button data-d="1" aria-label="Longer run">+</button>
+      </div>
+    </div>
+    <div class="f">
+      <span class="dot" style="background:var(--walk)"></span>
+      <div class="lbl"><div class="n">Walk</div><div class="u" id="uWalk">seconds</div></div>
+      <div class="step" data-key="walk" data-step="5" data-min="5" data-max="900">
+        <button data-d="-1" aria-label="Shorter walk">−</button>
+        <input inputmode="numeric" id="iWalk" aria-label="Walk seconds">
+        <button data-d="1" aria-label="Longer walk">+</button>
+      </div>
+    </div>
+    <div class="f">
+      <span class="dot" style="background:var(--fg)"></span>
+      <div class="lbl"><div class="n">Sets</div><div class="u" id="uSets">repeats</div></div>
+      <div class="step" data-key="sets" data-step="1" data-min="1" data-max="120">
+        <button data-d="-1" aria-label="Fewer sets">−</button>
+        <input inputmode="numeric" id="iSets" aria-label="Number of sets">
+        <button data-d="1" aria-label="More sets">+</button>
+      </div>
+    </div>
+    <div class="f">
+      <span class="dot" style="background:var(--cooldown)"></span>
+      <div class="lbl"><div class="n">Cool-down</div><div class="u" id="uCool">minutes</div></div>
+      <div class="step" data-key="cool" data-step="1" data-min="0" data-max="60">
+        <button data-d="-1" aria-label="Less cool-down">−</button>
+        <input inputmode="numeric" id="iCool" aria-label="Cool-down minutes">
+        <button data-d="1" aria-label="More cool-down">+</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="total">
+    <div><div class="k">Total</div><div class="v" id="tTotal">—</div></div>
+    <div><div class="k">Running</div><div class="v" id="tWork">—</div></div>
+    <div><div class="k">Walking</div><div class="v" id="tRest">—</div></div>
+  </div>
+
+  <div class="opts">
+    <div class="opt"><span>Spoken cues</span>
+      <div class="sw" id="swVoice" role="switch" aria-checked="true" tabindex="0"></div></div>
+    <div class="opt"><span>Keep screen awake</span>
+      <div class="sw" id="swWake" role="switch" aria-checked="true" tabindex="0"></div></div>
+    <div class="hrbtn" id="hrRow1" role="button" tabindex="0">
+      <span>&#9829; Heart rate sensor</span><span class="st" id="hrSt1">Tap to connect</span>
+    </div>
+  </div>
+
+  <div class="startbar"><button class="primary wide" id="btnStart">Start workout</button></div>
+</section>
+
+<!-- ================= WORKOUT ================= -->
+<section id="work" class="screen">
+  <div class="workhead">
+    <div class="eyebrow" id="topLabel"></div>
+    <div style="display:flex;gap:8px;flex:none">
+      <button class="theme" id="btnSettings" aria-label="Settings">⚙</button>
+      <button class="theme" id="themeB" aria-label="Switch theme">☾</button>
+    </div>
+  </div>
+  <div class="ringwrap">
+    <svg viewBox="0 0 200 200" aria-hidden="true">
+      <g id="segs"></g>
+      <circle id="outerTrack" cx="100" cy="100" r="91" style="display:none"></circle>
+      <circle id="outerFill"  cx="100" cy="100" r="91" style="display:none"></circle>
+      <circle id="arcTrack" cx="100" cy="100" r="72"></circle>
+      <circle id="arcFill"  cx="100" cy="100" r="72"></circle>
+    </svg>
+    <div class="center">
+      <div class="phase" id="phase">Warm up</div>
+      <div class="clock" id="clock">0:00</div>
+      <div class="setline" id="setline"></div>
+    </div>
+  </div>
+  <div class="hr" id="hrPill" aria-live="off">
+    <span class="beat" id="hrBeat">&#9829;</span>
+    <span class="bpm" id="hrBpm">--</span>
+    <span class="zone" id="hrZone">connect</span>
+  </div>
+  <div class="banner" id="banner"></div>
+  <div class="stats">
+    <div class="stat"><div class="k">Elapsed</div><div class="v" id="sElapsed">0:00</div></div>
+    <div class="stat"><div class="k">Left</div><div class="v" id="sLeft">0:00</div></div>
+    <div class="stat"><div class="k">Finish</div><div class="v" id="sFinish">—</div></div>
+  </div>
+  <div class="controls">
+    <button class="primary" id="btnPause">Pause</button>
+    <button class="ghost" id="btnEnd">End</button>
+  </div>
+</section>
+
+<!-- ================= DONE ================= -->
+<section id="done" class="screen">
+  <div>
+    <div class="eyebrow">Session complete</div>
+    <div class="big" id="dTitle">Done</div>
+  </div>
+  <div class="summary">
+    <div class="row"><span>Total time</span><span id="dTime">—</span></div>
+    <div class="row"><span>Sets completed</span><span id="dSets">—</span></div>
+    <div class="row"><span>Interval</span><span id="dInt">—</span></div>
+    <div class="row"><span>Time spent running</span><span id="dWork">—</span></div>
+  </div>
+  <button class="primary wide" id="btnAgain">Back to setup</button>
+</section>
+
+<!-- ================= SETTINGS ================= -->
+<div id="settings" role="dialog" aria-modal="true" aria-labelledby="setTitle">
+  <div class="sheet">
+    <h2 id="setTitle">Settings</h2>
+    <div class="opts">
+      <div class="opt"><span>Spoken cues</span>
+        <div class="sw" id="swVoice2" role="switch" aria-checked="true" tabindex="0"></div></div>
+      <div class="opt"><span>Keep screen awake</span>
+        <div class="sw" id="swWake2" role="switch" aria-checked="true" tabindex="0"></div></div>
+      <div class="hrbtn" id="hrRow2" role="button" tabindex="0">
+        <span>&#9829; Heart rate sensor</span><span class="st" id="hrSt2">Tap to connect</span>
+      </div>
+    </div>
+    <div class="btns">
+      <button class="ghost" id="setBack">End &amp; edit plan</button>
+      <button class="primary" id="setDone">Done</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= MODAL ================= -->
+<div id="modal" role="dialog" aria-modal="true" aria-labelledby="mTitle">
+  <div class="sheet">
+    <h2 id="mTitle"></h2>
+    <p id="mBody"></p>
+    <input id="mInput" style="display:none" autocomplete="off">
+    <div class="btns">
+      <button class="ghost" id="mNo">Cancel</button>
+      <button class="primary" id="mYes">OK</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+"use strict";
+
+/* Storage keys are permanent. Never rename these. */
+const K_CFG = "intervalTrainer_config_v1";
+const K_PRE = "intervalTrainer_presets_v1";
+const K_SES = "intervalTrainer_session_v1";
+const K_THM = "intervalTrainer_theme_v1";
+const K_PRF = "intervalTrainer_prefs_v1";
+
+const DEFAULTS = {warm:5, run:45, walk:90, sets:21, cool:3};
+const SEED = [
+  {name:"5 km base", cfg:{warm:5, run:45, walk:90, sets:21, cool:3}},
+  {name:"8 km base", cfg:{warm:5, run:45, walk:90, sets:33, cool:3}}
+];
+
+let cfg = {...DEFAULTS};
+let presets = [];
+let voice = true, wakeOn = true;
+let startTs = 0, pausedTotal = 0, pausedAt = 0, running = false;
+let cues = [], cueIdx = 0, ticker = null, wakeLock = null, live = null;
+
+const $ = id => document.getElementById(id);
+const clamp = (v,a,b) => Math.min(b, Math.max(a, v));
+const mmss = s => { s = Math.max(0, Math.ceil(s));
+  return Math.floor(s/60) + ":" + String(s%60).padStart(2,"0"); };
+const hm = s => { s = Math.round(s); const m = Math.floor(s/60);
+  return m >= 60 ? Math.floor(m/60)+"h "+(m%60)+"m" : m + " min"; };
+
+const store = {
+  get(k,f){ try { const v = localStorage.getItem(k); return v === null ? f : JSON.parse(v); }
+            catch(e){ return f; } },
+  set(k,v){ try { localStorage.setItem(k, JSON.stringify(v)); } catch(e){} },
+  del(k){ try { localStorage.removeItem(k); } catch(e){} }
+};
+
+/* ---------------- modal (native confirm/prompt are blocked in sandboxed viewers) ---------- */
+let mResolve = null;
+function closeModal(val){
+  $("modal").classList.remove("on");
+  const r = mResolve; mResolve = null;
+  if (r) r(val);
+}
+function openModal(opts){
+  return new Promise(res => {
+    mResolve = res;
+    $("mTitle").textContent = opts.title || "";
+    $("mBody").textContent = opts.body || "";
+    $("mBody").style.display = opts.body ? "" : "none";
+    $("mYes").textContent = opts.ok || "OK";
+    $("mNo").textContent = opts.cancel || "Cancel";
+    const inp = $("mInput");
+    if (opts.input !== undefined){
+      inp.style.display = ""; inp.value = opts.input;
+      setTimeout(() => { inp.focus(); inp.select(); }, 60);
+    } else {
+      inp.style.display = "none";
+    }
+    $("modal").classList.add("on");
+  });
+}
+const askConfirm = (title, body) => openModal({title:title, body:body, ok:"Yes", cancel:"No"});
+const askText = (title, value) =>
+  openModal({title:title, input:value, ok:"Save"}).then(v => v === false ? null : v);
+
+$("mYes").addEventListener("click", () => {
+  const inp = $("mInput");
+  closeModal(inp.style.display === "none" ? true : inp.value);
+});
+$("mNo").addEventListener("click", () => closeModal(false));
+$("modal").addEventListener("click", e => { if (e.target.id === "modal") closeModal(false); });
+$("mInput").addEventListener("keydown", e => { if (e.key === "Enter") $("mYes").click(); });
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape" && $("modal").classList.contains("on")) closeModal(false);
+});
+
+/* ---------------- theme ---------------- */
+let theme = store.get(K_THM, "dark");
+function applyTheme(){
+  document.documentElement.setAttribute("data-theme", theme);
+  const icon = theme === "dark" ? "☀" : "☾";
+  $("themeA").textContent = icon; $("themeB").textContent = icon;
+  const m = document.querySelector('meta[name="theme-color"]');
+  if (m) m.setAttribute("content", theme === "dark" ? "#000000" : "#F4F4F6");
+}
+function flipTheme(){
+  theme = theme === "dark" ? "light" : "dark";
+  store.set(K_THM, theme); applyTheme();
+}
+$("themeA").addEventListener("click", flipTheme);
+$("themeB").addEventListener("click", flipTheme);
+applyTheme();
+
+/* ---------------- plan ---------------- */
+const P = () => ({
+  warm: cfg.warm*60, run: cfg.run, walk: cfg.walk, sets: cfg.sets, cool: cfg.cool*60,
+  cyc: cfg.run + cfg.walk,
+  total: cfg.warm*60 + cfg.sets*(cfg.run+cfg.walk) + cfg.cool*60
+});
+
+/* ---------------- audio ---------------- */
+let ac = null, silentEl = null;
+function initAudio(){
+  if (!ac){
+    const AC = window.AudioContext || window.webkitAudioContext;
+    ac = new AC();
+    const o = ac.createOscillator(), g = ac.createGain();
+    g.gain.value = 0.0001; o.frequency.value = 60;
+    o.connect(g).connect(ac.destination); o.start();
+  }
+  if (ac.state === "suspended") ac.resume();
+  if (!silentEl){
+    silentEl = new Audio(silentWav());
+    silentEl.loop = true; silentEl.volume = 0.02;
+    silentEl.setAttribute("playsinline","");
+  }
+  silentEl.play().catch(()=>{});
+  if ("mediaSession" in navigator){
+    navigator.mediaSession.metadata = new MediaMetadata({
+      title: cfg.run + "s run / " + cfg.walk + "s walk",
+      artist: cfg.sets + " sets", album: "Interval Trainer"
+    });
+    navigator.mediaSession.playbackState = "playing";
+  }
+}
+function silentWav(){
+  const sr = 8000, n = sr*2, buf = new ArrayBuffer(44+n*2), v = new DataView(buf);
+  const w = (o,s)=>{ for (let i=0;i<s.length;i++) v.setUint8(o+i, s.charCodeAt(i)); };
+  w(0,"RIFF"); v.setUint32(4,36+n*2,true); w(8,"WAVEfmt ");
+  v.setUint32(16,16,true); v.setUint16(20,1,true); v.setUint16(22,1,true);
+  v.setUint32(24,sr,true); v.setUint32(28,sr*2,true); v.setUint16(32,2,true);
+  v.setUint16(34,16,true); w(36,"data"); v.setUint32(40,n*2,true);
+  for (let i=0;i<n;i++) v.setInt16(44+i*2, i%400===0 ? 1 : 0, true);
+  return URL.createObjectURL(new Blob([buf],{type:"audio/wav"}));
+}
+function beep(f,d,a){
+  if (!ac) return;
+  const t = ac.currentTime, o = ac.createOscillator(), g = ac.createGain();
+  o.frequency.value = f; o.type = "sine";
+  g.gain.setValueAtTime(0,t);
+  g.gain.linearRampToValueAtTime(a, t+0.01);
+  g.gain.setValueAtTime(a, t+d-0.03);
+  g.gain.linearRampToValueAtTime(0, t+d);
+  o.connect(g).connect(ac.destination); o.start(t); o.stop(t+d+0.02);
+}
+const dbl = (f,d,a) => { beep(f,d,a); setTimeout(()=>beep(f,d,a),(d+0.06)*1000); };
+function say(txt){
+  if (!voice || !("speechSynthesis" in window)) return;
+  try { const u = new SpeechSynthesisUtterance(txt);
+        u.rate = 1.05; u.lang = "en-US"; speechSynthesis.speak(u); } catch(e){}
+}
+
+/* ---------------- timeline ---------------- */
+function buildCues(){
+  const p = live; cues = []; cueIdx = 0;
+  for (let i = 0; i < p.sets; i++){
+    const r0 = p.warm + i*p.cyc, w0 = r0 + p.run, n = i+1;
+    if (p.run > 8) cues.push({t:r0-3, k:"prep"});
+    cues.push({t:r0, k:"run", n:n});
+    if (p.walk > 8) cues.push({t:w0-3, k:"prep"});
+    cues.push({t:w0, k:"walk", n:n});
+  }
+  const end = p.warm + p.sets*p.cyc;
+  if (p.cool > 0) cues.push({t:end, k:"cool"});
+  cues.push({t:end + p.cool, k:"done"});
+  cues.sort((a,b) => a.t - b.t);
+}
+function stateAt(t){
+  const p = live;
+  if (t < p.warm) return {p:"warmup", label:"Warm up", set:0, done:0, left:p.warm-t, dur:p.warm};
+  const a = t - p.warm;
+  if (a < p.sets*p.cyc){
+    const i = Math.floor(a/p.cyc), o = a - i*p.cyc;
+    return o < p.run
+      ? {p:"run",  label:"Run",  set:i+1, done:i, left:p.run-o, dur:p.run}
+      : {p:"walk", label:"Walk", set:i+1, done:i, left:p.cyc-o, dur:p.walk};
+  }
+  const c = a - p.sets*p.cyc;
+  if (c < p.cool) return {p:"cooldown", label:"Cool down", set:p.sets, done:p.sets, left:p.cool-c, dur:p.cool};
+  return {p:"done", label:"Done", set:p.sets, done:p.sets, left:0, dur:1};
+}
+
+/* ---------------- ring ---------------- */
+const R_SEG = 91, R_ARC = 72, C_ARC = 2*Math.PI*R_ARC, C_OUT = 2*Math.PI*R_SEG;
+let segEls = [], segMode = true;
+function drawSegs(){
+  const n = live.sets, g = $("segs");
+  g.innerHTML = ""; segEls = [];
+  segMode = n <= 45;
+  $("outerTrack").style.display = $("outerFill").style.display = segMode ? "none" : "";
+  if (!segMode){
+    $("outerFill").style.strokeDasharray = C_OUT;
+    $("arcFill").style.strokeDasharray = C_ARC;
+    return;
+  }
+  const gapDeg = n > 30 ? 2.2 : (n > 18 ? 3.2 : 4.5), step = 360/n;
+  for (let i = 0; i < n; i++){
+    const a0 = (i*step + gapDeg/2) * Math.PI/180;
+    const a1 = ((i+1)*step - gapDeg/2) * Math.PI/180;
+    const el = document.createElementNS("http://www.w3.org/2000/svg","path");
+    el.setAttribute("d",
+      "M " + (100+R_SEG*Math.cos(a0)) + " " + (100+R_SEG*Math.sin(a0)) +
+      " A " + R_SEG + " " + R_SEG + " 0 0 1 " +
+      (100+R_SEG*Math.cos(a1)) + " " + (100+R_SEG*Math.sin(a1)));
+    el.setAttribute("class","seg");
+    g.appendChild(el); segEls.push(el);
+  }
+  $("arcFill").style.strokeDasharray = C_ARC;
+}
+
+/* ---------------- loop ---------------- */
+function elapsed(){
+  if (!startTs) return 0;
+  return ((running ? Date.now() : pausedAt) - startTs - pausedTotal) / 1000;
+}
+function tick(){
+  const t = elapsed(), p = live;
+  if (running){
+    while (cueIdx < cues.length && cues[cueIdx].t <= t){
+      const c = cues[cueIdx++];
+      if (t - c.t > 2) continue;
+      if (c.k === "prep") beep(780, 0.05, 0.22);
+      else if (c.k === "run"){
+        dbl(1050, 0.11, 0.5);
+        say(c.n === p.sets ? "Run. Last set." : (c.n % 5 === 0 ? "Run. Set " + c.n : "Run"));
+      }
+      else if (c.k === "walk"){ beep(560, 0.3, 0.45); say("Walk"); }
+      else if (c.k === "cool"){ beep(560, 0.5, 0.45); say("Sets complete. Cool down."); }
+      else if (c.k === "done"){ dbl(880, 0.2, 0.5); say("Session finished. Well done."); }
+    }
+  }
+  const s = stateAt(t);
+  if (s.p === "done" && running) return finish();
+
+  document.documentElement.style.setProperty("--accent","var(--"+s.p+")");
+  $("phase").textContent = running ? s.label : "Paused";
+  $("clock").textContent = mmss(s.left);
+  $("setline").innerHTML = s.p === "warmup"
+    ? "<b>" + p.sets + "</b> sets ahead"
+    : "Set <b>" + s.set + "</b> of " + p.sets;
+  $("arcFill").style.strokeDashoffset = C_ARC * (1 - s.left/s.dur);
+
+  if (segMode){
+    for (let i = 0; i < segEls.length; i++){
+      segEls[i].setAttribute("class",
+        "seg" + (i < s.done ? " done" : (i === s.done && s.set ? " now" : "")));
+    }
+  } else {
+    $("outerFill").style.strokeDashoffset = C_OUT * (1 - s.done/p.sets);
+  }
+
+  const left = Math.max(0, p.total - t);
+  $("sElapsed").textContent = mmss(t);
+  $("sLeft").textContent = mmss(left);
+  $("sFinish").textContent = new Date(Date.now()+left*1000)
+    .toLocaleTimeString([], {hour:"2-digit", minute:"2-digit"});
+  saveSession();
+}
+
+/* ---------------- wake lock ---------------- */
+async function getWake(){
+  if (!wakeOn || !("wakeLock" in navigator)) {
+    if (wakeOn) banner("Open in Safari over https for screen-awake. Keep the display on for now.");
+    return;
+  }
+  try { wakeLock = await navigator.wakeLock.request("screen"); }
+  catch(e){ banner("Screen may sleep. Keep the display on."); }
+}
+const banner = m => { $("banner").textContent = m; $("banner").classList.add("on"); };
+const hideBanner = () => $("banner").classList.remove("on");
+
+/* iOS suspends audio when the phone locks; resuming it needs a real tap. */
+let audioArmed = false;
+function armAudioGesture(){
+  if (audioArmed) return;
+  audioArmed = true;
+  banner("Audio was paused by iOS — tap anywhere to restore the cues.");
+  const h = () => {
+    document.removeEventListener("pointerdown", h);
+    audioArmed = false;
+    initAudio();
+    setTimeout(() => { if (ac && ac.state === "running") hideBanner(); }, 120);
+  };
+  document.addEventListener("pointerdown", h);
+}
+function ensureAudio(){
+  if (!ac) return;
+  const done = () => {
+    if (ac.state === "running"){
+      if (silentEl && silentEl.paused) silentEl.play().catch(()=>{});
+      if (audioArmed) return;
+      hideBanner();
+    } else armAudioGesture();
+  };
+  try { const p = ac.resume(); p && p.then ? p.then(done).catch(armAudioGesture) : done(); }
+  catch(e){ armAudioGesture(); }
+}
+
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible"){
+    if (running){ getWake(); ensureAudio(); }
+    if (live) tick();
+  }
+});
+
+/* ---------------- persistence ---------------- */
+function saveSession(){
+  store.set(K_SES, {cfg:cfg, startTs:startTs, pausedTotal:pausedTotal,
+    pausedAt:pausedAt, running:running, voice:voice, cueIdx:cueIdx});
+}
+function restoreSession(){
+  const d = store.get(K_SES, null);
+  if (!d || !d.startTs) return false;
+  if (Date.now() - d.startTs > 4*3600*1000){ store.del(K_SES); return false; }
+  cfg = d.cfg;
+  if (typeof d.voice === "boolean") voice = d.voice;
+  syncSwitches();
+  startTs = d.startTs;
+  pausedTotal = d.pausedTotal; pausedAt = d.pausedAt || Date.now(); running = false;
+  live = P(); buildCues(); drawSegs();
+  cueIdx = cues.findIndex(c => c.t > elapsed());
+  if (cueIdx < 0) cueIdx = cues.length;
+  $("topLabel").textContent = label();
+  $("btnPause").textContent = "Resume";
+  document.body.classList.add("paused");
+  show("work"); tick();
+  clearInterval(ticker); ticker = setInterval(tick, 200);
+  banner("Session restored. Tap Resume to continue.");
+  return true;
+}
+const label = () => cfg.run + "s run / " + cfg.walk + "s walk · " + cfg.sets + " sets";
+
+/* ---------------- setup UI ---------------- */
+const FIELDS = {warm:"iWarm", run:"iRun", walk:"iWalk", sets:"iSets", cool:"iCool"};
+function paint(){
+  for (const k in FIELDS) $(FIELDS[k]).value = cfg[k];
+  const p = P();
+  $("tTotal").textContent = hm(p.total);
+  $("tWork").textContent  = hm(p.sets * p.run);
+  $("tRest").textContent  = hm(p.warm + p.sets*p.walk + p.cool);
+  $("uWarm").textContent = cfg.warm ? mmss(cfg.warm*60) + " min" : "skipped";
+  $("uCool").textContent = cfg.cool ? mmss(cfg.cool*60) + " min" : "skipped";
+  $("uRun").textContent  = "seconds · " + mmss(cfg.run);
+  $("uWalk").textContent = "seconds · " + mmss(cfg.walk);
+  $("uSets").textContent = cfg.sets + " × " + mmss(cfg.run + cfg.walk) + " cycle";
+  store.set(K_CFG, cfg);
+}
+function bump(step, dir){
+  const k = step.dataset.key, s = +step.dataset.step;
+  cfg[k] = clamp(cfg[k] + dir*s, +step.dataset.min, +step.dataset.max);
+  paint();
+}
+document.querySelectorAll(".step").forEach(step => {
+  step.querySelectorAll("button").forEach(b => {
+    let to, iv;
+    const go = () => bump(step, +b.dataset.d);
+    b.addEventListener("pointerdown", e => {
+      e.preventDefault(); go();
+      to = setTimeout(() => { iv = setInterval(go, 70); }, 420);
+    });
+    ["pointerup","pointerleave","pointercancel"].forEach(ev =>
+      b.addEventListener(ev, () => { clearTimeout(to); clearInterval(iv); }));
+  });
+  const inp = step.querySelector("input");
+  inp.addEventListener("focus", () => inp.select());
+  inp.addEventListener("input", () => { inp.value = inp.value.replace(/\D/g,"").slice(0,3); });
+  inp.addEventListener("blur", () => {
+    const k = step.dataset.key;
+    cfg[k] = clamp(parseInt(inp.value || "0", 10) || 0, +step.dataset.min, +step.dataset.max);
+    paint();
+  });
+  inp.addEventListener("keydown", e => { if (e.key === "Enter") inp.blur(); });
+});
+
+/* ---------------- presets ---------------- */
+function renderPresets(){
+  const wrap = $("presets"); wrap.innerHTML = "";
+  presets.forEach((p, i) => {
+    const el = document.createElement("div");
+    el.className = "chip";
+    el.innerHTML = "<span></span><small></small>";
+    el.firstChild.textContent = p.name;
+    el.querySelector("small").textContent = p.cfg.run + "/" + p.cfg.walk + "×" + p.cfg.sets;
+    el.addEventListener("click", () => { cfg = {...p.cfg}; paint(); });
+    const x = document.createElement("span");
+    x.className = "x"; x.textContent = "×"; x.setAttribute("role","button");
+    x.setAttribute("aria-label","Delete preset " + p.name);
+    x.addEventListener("click", async e => {
+      e.stopPropagation();
+      if (await askConfirm("Delete preset?", p.name)){
+        presets.splice(i,1); store.set(K_PRE, presets); renderPresets();
+      }
+    });
+    el.appendChild(x);
+    wrap.appendChild(el);
+  });
+  const add = document.createElement("div");
+  add.className = "chip add"; add.textContent = "+ Save current";
+  add.addEventListener("click", async () => {
+    const name = await askText("Name this preset", cfg.run + "/" + cfg.walk + " × " + cfg.sets);
+    if (!name || !name.trim()) return;
+    presets.push({name: name.trim().slice(0,24), cfg: {...cfg}});
+    store.set(K_PRE, presets); renderPresets();
+  });
+  wrap.appendChild(add);
+}
+
+/* ---------------- switches (state persists; both copies stay in sync) ---------------- */
+function savePrefs(){ store.set(K_PRF, {voice:voice, wake:wakeOn}); }
+function syncSwitches(){
+  [["swVoice",voice],["swVoice2",voice],["swWake",wakeOn],["swWake2",wakeOn]].forEach(pair => {
+    const el = $(pair[0]);
+    if (el) el.setAttribute("aria-checked", String(pair[1]));
+  });
+}
+function setVoice(v){
+  voice = v; savePrefs(); syncSwitches();
+  if (!v && "speechSynthesis" in window){ try { speechSynthesis.cancel(); } catch(e){} }
+}
+function setWake(v){
+  wakeOn = v; savePrefs(); syncSwitches();
+  if (!v && wakeLock){ wakeLock.release().catch(()=>{}); wakeLock = null; }
+  else if (v && running) getWake();
+}
+function bindSwitch(id, fn, get){
+  const el = $(id); if (!el) return;
+  const flip = () => fn(!get());
+  el.addEventListener("click", flip);
+  el.addEventListener("keydown", e => {
+    if (e.key === " " || e.key === "Enter"){ e.preventDefault(); flip(); }
+  });
+}
+bindSwitch("swVoice",  setVoice, () => voice);
+bindSwitch("swVoice2", setVoice, () => voice);
+bindSwitch("swWake",   setWake,  () => wakeOn);
+bindSwitch("swWake2",  setWake,  () => wakeOn);
+
+/* settings sheet */
+$("btnSettings").addEventListener("click", () => {
+  syncSwitches(); $("settings").classList.add("on");
+});
+$("setDone").addEventListener("click", () => $("settings").classList.remove("on"));
+$("settings").addEventListener("click", e => {
+  if (e.target.id === "settings") $("settings").classList.remove("on");
+});
+$("setBack").addEventListener("click", async () => {
+  $("settings").classList.remove("on");
+  if (await askConfirm("End and edit plan?", "This session will be discarded.")){
+    running = false; clearInterval(ticker);
+    if (wakeLock){ wakeLock.release().catch(()=>{}); wakeLock = null; }
+    if (silentEl) silentEl.pause();
+    store.del(K_SES);
+    startTs = 0; live = null;
+    $("banner").classList.remove("on");
+    show("setup");
+  }
+});
+
+/* ---------------- heart rate (Polar H10 / any BLE HR strap) ---------------- */
+const ZONE_LO = 115, ZONE_HI = 140;   /* Zone 2 for this plan */
+let hrDevice = null, hrBpm = 0, hrSeen = 0, hrTimer = null;
+
+function hrZoneInfo(bpm){
+  if (bpm < ZONE_LO)      return {name:"easy",   color:"var(--walk)"};
+  if (bpm <= ZONE_HI)     return {name:"zone 2", color:"var(--run)"};
+  if (bpm <= ZONE_HI + 10) return {name:"high",  color:"var(--warmup)"};
+  return {name:"back off", color:"#FF453A"};
+}
+function paintHR(){
+  const pill = $("hrPill");
+  if (!hrDevice){ pill.classList.remove("on"); setHRStatus("Tap to connect"); return; }
+  pill.classList.add("on");
+  const stale = Date.now() - hrSeen > 6000;
+  pill.classList.toggle("stale", stale);
+  if (!hrBpm){ $("hrBpm").textContent = "--"; $("hrZone").textContent = "waiting"; return; }
+  const z = hrZoneInfo(hrBpm);
+  $("hrBpm").textContent = hrBpm;
+  $("hrBpm").style.color = z.color;
+  $("hrBeat").style.color = z.color;
+  $("hrZone").textContent = stale ? "signal lost" : z.name;
+  $("hrZone").style.color = z.color;
+  setHRStatus(stale ? "Signal lost" : hrBpm + " bpm");
+}
+function setHRStatus(t){
+  const a = $("hrSt1"), b = $("hrSt2");
+  if (a) a.textContent = t; if (b) b.textContent = t;
+}
+function onHRValue(e){
+  const v = e.target.value;
+  const flags = v.getUint8(0);
+  hrBpm = (flags & 0x1) ? v.getUint16(1, true) : v.getUint8(1);
+  hrSeen = Date.now();
+  paintHR();
+}
+function onHRDisconnect(){
+  setHRStatus("Reconnecting\u2026");
+  if (!hrDevice) return;
+  hrDevice.gatt.connect()
+    .then(srv => srv.getPrimaryService("heart_rate"))
+    .then(svc => svc.getCharacteristic("heart_rate_measurement"))
+    .then(ch => ch.startNotifications().then(() => {
+      ch.addEventListener("characteristicvaluechanged", onHRValue);
+      paintHR();
+    }))
+    .catch(() => setHRStatus("Disconnected \u2014 tap to reconnect"));
+}
+async function connectHR(){
+  if (!navigator.bluetooth){
+    openModal({title:"Bluetooth not available here",
+      body:"This viewer can't reach Bluetooth. On iPhone, open this page in the free " +
+           "Bluefy browser (App Store) \u2014 Safari doesn't support Web Bluetooth. " +
+           "Chrome on Android or desktop also works.",
+      ok:"OK", cancel:"Close"});
+    return;
+  }
+  try {
+    setHRStatus("Choosing device\u2026");
+    hrDevice = await navigator.bluetooth.requestDevice({
+      filters:[{services:["heart_rate"]}]
+    });
+    hrDevice.addEventListener("gattserverdisconnected", onHRDisconnect);
+    setHRStatus("Connecting\u2026");
+    const server = await hrDevice.gatt.connect();
+    const svc = await server.getPrimaryService("heart_rate");
+    const ch  = await svc.getCharacteristic("heart_rate_measurement");
+    await ch.startNotifications();
+    ch.addEventListener("characteristicvaluechanged", onHRValue);
+    paintHR();
+    if (!hrTimer) hrTimer = setInterval(paintHR, 2000);
+  } catch(err){
+    hrDevice = null;
+    setHRStatus(err && err.name === "NotFoundError" ? "Tap to connect" : "Failed \u2014 tap to retry");
+  }
+}
+["hrRow1","hrRow2"].forEach(id => {
+  const el = $(id); if (!el) return;
+  el.addEventListener("click", connectHR);
+  el.addEventListener("keydown", e => {
+    if (e.key === " " || e.key === "Enter"){ e.preventDefault(); connectHR(); }
+  });
+});
+$("hrPill").addEventListener("click", () => { if (!hrDevice) connectHR(); });
+
+/* ---------------- flow ---------------- */
+const show = id => document.querySelectorAll(".screen")
+  .forEach(s => s.classList.toggle("on", s.id === id));
+
+function begin(){
+  live = P();
+  initAudio(); buildCues(); drawSegs();
+  startTs = Date.now(); pausedTotal = 0; pausedAt = 0; running = true; cueIdx = 0;
+  $("topLabel").textContent = label();
+  $("btnPause").textContent = "Pause";
+  document.body.classList.remove("paused");
+  $("banner").classList.remove("on");
+  show("work"); getWake();
+  say(live.warm ? "Warm up walk. " + cfg.warm + " minute" + (cfg.warm>1?"s":"") + "." : "Let's go.");
+  tick();
+  clearInterval(ticker); ticker = setInterval(tick, 200);
+}
+function togglePause(){
+  if (running){
+    running = false; pausedAt = Date.now();
+    document.body.classList.add("paused");
+    $("btnPause").textContent = "Resume";
+    if (wakeLock){ wakeLock.release().catch(()=>{}); wakeLock = null; }
+  } else {
+    pausedTotal += Date.now() - pausedAt; pausedAt = 0; running = true;
+    document.body.classList.remove("paused");
+    $("btnPause").textContent = "Pause";
+    initAudio(); getWake();
+  }
+  tick();
+}
+function finish(){
+  const t = elapsed(), s = stateAt(t);
+  running = false; clearInterval(ticker);
+  if (wakeLock){ wakeLock.release().catch(()=>{}); wakeLock = null; }
+  if (silentEl) silentEl.pause();
+  store.del(K_SES);
+  $("dTitle").textContent = mmss(t);
+  $("dTime").textContent = mmss(t);
+  $("dSets").textContent = s.done + " of " + live.sets;
+  $("dInt").textContent = cfg.run + "s / " + cfg.walk + "s";
+  $("dWork").textContent = hm(s.done * live.run);
+  show("done");
+}
+
+$("btnStart").addEventListener("click", begin);
+$("btnPause").addEventListener("click", togglePause);
+$("btnEnd").addEventListener("click", async () => {
+  if (await askConfirm("End this workout?", "Your progress so far will be saved to the summary.")) finish();
+});
+$("btnAgain").addEventListener("click", () => show("setup"));
+
+/* ---------------- boot ---------------- */
+const pf = store.get(K_PRF, null);
+if (pf && typeof pf === "object"){
+  voice  = pf.voice !== false;
+  wakeOn = pf.wake  !== false;
+}
+syncSwitches();
+
+presets = store.get(K_PRE, null);
+if (!Array.isArray(presets) || !presets.length){ presets = SEED.slice(); store.set(K_PRE, presets); }
+cfg = {...DEFAULTS, ...store.get(K_CFG, {})};
+paint();
+renderPresets();
+restoreSession();
+})();
+</script>
+</body>
+</html>
