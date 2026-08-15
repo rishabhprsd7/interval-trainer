@@ -857,9 +857,10 @@ function onHRDisconnect(){
 async function connectHR(){
   if (!navigator.bluetooth){
     openModal({title:"Bluetooth not available here",
-      body:"This viewer can't reach Bluetooth. On iPhone, open this page in the free " +
-           "Bluefy browser (App Store) \u2014 Safari doesn't support Web Bluetooth. " +
-           "Chrome on Android or desktop also works.",
+      body:"On iPhone, every browser \u2014 Safari, Chrome, Edge \u2014 runs on Apple's " +
+           "engine, which has no Web Bluetooth. Open this page in the free Bluefy " +
+           "browser (App Store) to connect the H10. Chrome on Android or a computer " +
+           "also works.",
       ok:"OK", cancel:"Close"});
     return;
   }
